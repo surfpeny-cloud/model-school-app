@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>ИмиджЛаб — интеллект для моделей</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <div class="hero-section">
+            <div class="logo">
+                <span class="logo-icon">💜</span>
+                <span class="logo-text">Имидж<span class="gold">Лаб</span></span>
+            </div>
+            <h1 class="title">Развивай интеллект<br>как топ-модель</h1>
+            <p class="subtitle">Смотри фильмы, проходи тесты, получай короны</p>
+        </div>
+
+        <div class="auth-card glass">
+            <div class="auth-tabs">
+                <button class="tab-btn active" data-tab="login">Вход</button>
+                <button class="tab-btn" data-tab="register">Регистрация</button>
+            </div>
+
+            <div id="login-form" class="auth-form active">
+                <input type="email" id="login-email" placeholder="Email" class="input-field">
+                <input type="password" id="login-password" placeholder="Пароль" class="input-field">
+                <button id="login-btn" class="btn-gold">Войти →</button>
+            </div>
+
+            <div id="register-form" class="auth-form">
+                <input type="text" id="reg-name" placeholder="Ваше имя" class="input-field">
+                <input type="email" id="reg-email" placeholder="Email" class="input-field">
+                <input type="password" id="reg-password" placeholder="Пароль" class="input-field">
+                <input type="text" id="reg-school" placeholder="Название школы" class="input-field">
+                <button id="register-btn" class="btn-gold">Начать путь →</button>
+            </div>
+        </div>
+
+        <div class="features">
+            <div class="feature">
+                <span class="feature-icon">🎬</span>
+                <span>Кино-ДЗ</span>
+            </div>
+            <div class="feature">
+                <span class="feature-icon">📝</span>
+                <span>Умные тесты</span>
+            </div>
+            <div class="feature">
+                <span class="feature-icon">👑</span>
+                <span>Коронация</span>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
+    <script src="firebase-config.js"></script>
+    <script>
+        document.getElementById('register-btn')?.addEventListener('click', async () => {
+            const name = document.getElementById('reg-name').value;
+            const email = document.getElementById('reg-email').value;
+            const password = document.getElementById('reg-password').value;
+            const school = document.getElementById('reg-school').value;
+            
+            if (!name || !email || !password) {
+                alert('Заполните все поля');
+                return;
+            }
+            
+            try {
+                const userCred = await auth.createUserWithEmailAndPassword(email, password);
+                await userCred.user.updateProfile({ displayName: name });
+                await db.collection('users').doc(userCred.user.uid).set({
+                    name: name,
+                    email: email,
+                    school: school || 'ИмиджЛаб',
+                    level: 1,
+                    points: 0,
+                    title: 'Miss Curiosity',
+                    completedHomeworks: [],
+                    createdAt: new Date()
+                });
+                alert('Добро пожаловать в ИмиджЛаб!');
+            } catch (error) {
+                alert('Ошибка: ' + error.message);
+            }
+        });
+
+        document.getElementById('login-btn')?.addEventListener('click', async () => {
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            
+            try {
+                await auth.signInWithEmailAndPassword(email, password);
+            } catch (error) {
+                alert('Неверный email или пароль');
+            }
+        });
+
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tab = btn.dataset.tab;
+                document.querySelectorAll('.auth-form').forEach(form => form.classList.remove('active'));
+                document.getElementById(`${tab}-form`).classList.add('active');
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+            });
+        });
+        
+        auth.onAuthStateChanged((user) => {
+            if (user && window.location.pathname.includes('index.html')) {
+                window.location.href = 'dashboard.html';
+            }
+        });
+    </script>
+</body>
+</html>
