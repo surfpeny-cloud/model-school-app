@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ИмиджЛаб — задания</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <div class="profile-header glass">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h3 id="user-name" style="font-family: 'Playfair Display';">Загрузка...</h3>
+                    <p id="user-title" style="color: var(--primary); font-weight: 500;">Miss Curiosity</p>
+                </div>
+                <div style="text-align: right;">
+                    <span style="font-size: 14px; color: var(--text-gray);">Уровень</span>
+                    <span id="user-level" style="font-size: 28px; font-weight: 700;">1</span>
+                </div>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="level-progress" style="width: 0%;"></div>
+            </div>
+            <p style="font-size: 12px; margin-top: 8px;" id="next-title">✨ Следующее звание: Miss Elegance</p>
+        </div>
+
+        <h2 style="font-family: 'Playfair Display'; margin-bottom: 16px;">🎬 Твои задания</h2>
+        <div id="homeworks-list"></div>
+    </div>
+
+    <div class="bottom-nav">
+        <button class="nav-item active" onclick="location.href='dashboard.html'">
+            <span class="nav-icon">📋</span>
+            <span>Задания</span>
+        </button>
+        <button class="nav-item" onclick="location.href='rating.html'">
+            <span class="nav-icon">🏆</span>
+            <span>Рейтинг</span>
+        </button>
+        <button class="nav-item" onclick="location.href='wardrobe.html'">
+            <span class="nav-icon">👗</span>
+            <span>Гардеробная</span>
+        </button>
+        <button class="nav-item" onclick="location.href='profile.html'">
+            <span class="nav-icon">👤</span>
+            <span>Профиль</span>
+        </button>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="firebase-config.js"></script>
+    <script>
+        let currentUserData = null;
+        let homeworksData = [];
+
+        async function loadDashboard() {
+            const user = auth.currentUser;
+            if (!user) {
+                window.location.href = 'index.html';
+                return;
+            }
+
+            const homeworksSnap = await db.collection('homeworks').orderBy('id').get();
+            homeworksData = [];
+            homeworksSnap.forEach(doc => {
+                homeworksData.push(doc.data());
+            });
+
+            const userDoc = await db.collection('users').doc(user.uid).get();
+            currentUserData = userDoc.data();
+            
+            document.getElementById('user-name').innerText = currentUserData.name || 'Модель';
+            document.getElementById('user-title').innerText = currentUserData.title || 'Miss Curiosity';
+            document.getElementById('user-level').innerText = currentUserData.level || 1;
+            
+            const completed = currentUserData.completedHomeworks || [];
+            const progress = homeworksData.length > 0 ? (completed.length / homeworksData.length) * 100 : 0;
+            document.getElementById('level-progress').style.width = progress + '%';
+            
+            const container = document.getElementById('homeworks-list');
+            container.innerHTML = '';
+            
+            if (homeworksData.length === 0) {
+                container.innerHTML = '<div class="glass" style="text-align: center;">🎬 Скоро здесь появятся задания от школы</div>';
+                return;
+            }
+            
+            homeworksData.forEach(hw => {
+                const isCompleted = completed.includes(hw.id);
+                const card = document.createElement('div');
+                card.className = 'homework-card';
+                card.innerHTML = `
+                    <img src="${hw.poster}" class="homework-poster" onerror="this.src='https://via.placeholder.com/400x200?text=ИмиджЛаб'">
+                    <div class="homework-content">
+                        <h3 class="homework-title">${hw.title}</h3>
+                        <div class="homework-duration">⏱ ${hw.duration}</div>
+                        ${!isCompleted ? `
+                            <button class="btn-gold" onclick="startHomework(${hw.id})">Начать тест →</button>
+                        ` : `
+                            <div style="color: var(--success);">✅ Пройдено! + очки</div>
+                        `}
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function startHomework(id) {
+            const homework = homeworksData.find(h => h.id === id);
+            localStorage.setItem('currentHomework', JSON.stringify(homework));
+            window.location.href = 'test.html';
+        }
+
+        auth.onAuthStateChanged(user => {
+            if (user && window.location.pathname.includes('dashboard.html')) {
+                loadDashboard();
+            } else if (!user && window.location.pathname.includes('dashboard.html')) {
+                window.location.href = 'index.html';
+            }
+        });
+    </script>
+</body>
+</html>
