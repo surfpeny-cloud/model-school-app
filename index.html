@@ -57,10 +57,20 @@
         </div>
     </div>
 
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <!-- Firebase скрипты -->
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
+
+<!-- Дальше идёт ваш код с обработчиками -->
+<script>
+    // Теперь auth и db доступны
+    document.getElementById('register-btn')?.addEventListener('click', async () => {
+        const userCred = await auth.createUserWithEmailAndPassword(email, password);
+        // ...
+    });
+</script>
         document.getElementById('register-btn')?.addEventListener('click', async () => {
             const name = document.getElementById('reg-name').value;
             const email = document.getElementById('reg-email').value;
