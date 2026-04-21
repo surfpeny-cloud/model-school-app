@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест — ИмиджЛаб</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <div class="glass" style="text-align: center;">
+            <h2 id="homework-title" style="font-family: 'Playfair Display';">Загрузка...</h2>
+            <div class="progress-bar" style="margin: 20px 0;">
+                <div id="question-progress" class="progress-fill" style="width: 0%;"></div>
+            </div>
+            <div id="question-container"></div>
+            <div id="result-container" style="display: none;">
+                <h1 id="result-score"></h1>
+                <button class="btn-gold" onclick="window.location.href='dashboard.html'">Вернуться к заданиям</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="firebase-config.js"></script>
+    <script>
+        let homework = null;
+        let currentQuestion = 0;
+        let answers = [];
+        
+        function loadTest() {
+            homework = JSON.parse(localStorage.getItem('currentHomework'));
+            if (!homework) {
+                window.location.href = 'dashboard.html';
+                return;
+            }
+            document.getElementById('homework-title').innerText = homework.title;
+            showQuestion();
+        }
+        
+        function showQuestion() {
+            if (currentQuestion >= homework.questions.length) {
+                calculateResult();
+                return;
+            }
+            
+            const q = homework.questions[currentQuestion];
+            const progressPercent = (currentQuestion / homework.questions.length) * 100;
+            document.getElementById('question-progress').style.width = progressPercent + '%';
+            
+            const container = document.getElementById('question-container');
+            container.innerHTML = `
+                <h3 style="margin-bottom: 20px;">${q.text}</h3>
+                ${q.options.map((opt, idx) => `
+                    <button class="btn-outline" style="margin: 8px 0; width: 100%; text-align: left;" onclick="answer(${idx})">
+                        ${String.fromCharCode(65+idx)}. ${opt}
+                    </button>
+                `).join('')}
+            `;
+        }
+        
+        function answer(selected) {
+            const isCorrect = selected === homework.questions[currentQuestion].correct;
+            answers.push(isCorrect);
+            
+            const btns = document.querySelectorAll('.btn-outline');
+            if (isCorrect) {
+                btns[selected].style.background = '#27AE60';
+                btns[selected].style.color = 'white';
+            } else {
+                btns[selected].style.background = '#E74C3C';
+                btns[selected].style.color = 'white';
+                const correctBtn = btns[homework.questions[currentQuestion].correct];
+                if (correctBtn) {
+                    correctBtn.style.background = '#27AE60';
+                    correctBtn.style.color = 'white';
+                }
+            }
+            
+            setTimeout(() => {
+                currentQuestion++;
+                showQuestion();
+            }, 1000);
+        }
+        
+        async function calculateResult() {
+            const correct = answers.filter(a => a === true).length;
+            const score = Math.round((correct / homework.questions.length) * 100);
+            const pointsEarned = score;
+            
+            const user = auth.currentUser;
+            if (user) {
+                const userRef = db.collection('users').doc(user.uid);
+                const userDoc = await userRef.get();
+                const currentPoints = userDoc.data().points || 0;
+                const completed = userDoc.data().completedHomeworks || [];
+                
+                if (!completed.includes(homework.id)) {
+                    completed.push(homework.id);
+                    const newPoints = currentPoints + pointsEarned;
+                    let newLevel = Math.floor(newPoints / 100) + 1;
+                    let newTitle = 'Miss Curiosity';
+                    if (newPoints >= 500) newTitle = 'Miss Genius';
+                    else if (newPoints >= 300) newTitle = 'Miss Intellectual';
+                    else if (newPoints >= 150) newTitle = 'Miss Elegance';
+                    
+                    await userRef.update({
+                        points: newPoints,
+                        level: newLevel,
+                        title: newTitle,
+                        completedHomeworks: completed
+                    });
+                }
+            }
+            
+            document.getElementById('question-container').style.display = 'none';
+            document.getElementById('result-container').style.display = 'block';
+            document.getElementById('result-score').innerHTML = `
+                🎉 Ты набрала ${score} баллов!<br>
+                +${pointsEarned} очков гениальности
+            `;
+            
+            // Конфетти
+            for (let i = 0; i < 50; i++) {
+                const conf = document.createElement('div');
+                conf.className = 'confetti';
+                conf.style.left = Math.random() * 100 + '%';
+                conf.style.animationDelay = Math.random() + 's';
+                conf.style.background = `hsl(${Math.random() * 360}, 100%, 50%)`;
+                document.body.appendChild(conf);
+                setTimeout(() => conf.remove(), 2000);
+            }
+        }
+        
+        auth.onAuthStateChanged(user => {
+            if (!user) window.location.href = 'index.html';
+            else loadTest();
+        });
+    </script>
+</body>
+</html>
