@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Профиль — ИмиджЛаб</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <div class="glass" style="text-align: center;">
+            <div style="font-size: 80px;">👸</div>
+            <h2 id="profile-name" style="font-family: 'Playfair Display';">Загрузка...</h2>
+            <p id="profile-title" style="color: var(--primary); font-size: 20px;"></p>
+            <div class="progress-bar" style="margin: 20px 0;">
+                <div id="profile-progress" class="progress-fill" style="width: 0%;"></div>
+            </div>
+            <p><strong>🏆 Очки гениальности:</strong> <span id="profile-points">0</span></p>
+            <p><strong>📚 Выполнено заданий:</strong> <span id="profile-completed">0</span>/<span id="total-homeworks">0</span></p>
+            <button class="btn-outline" onclick="logout()" style="margin-top: 20px;">Выйти</button>
+        </div>
+    </div>
+    
+    <div class="bottom-nav">
+        <button class="nav-item" onclick="location.href='dashboard.html'">📋 Задания</button>
+        <button class="nav-item" onclick="location.href='rating.html'">🏆 Рейтинг</button>
+        <button class="nav-item" onclick="location.href='wardrobe.html'">👗 Гардеробная</button>
+        <button class="nav-item active" onclick="location.href='profile.html'">👤 Профиль</button>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="firebase-config.js"></script>
+    <script>
+        async function loadProfile() {
+            const user = auth.currentUser;
+            if (!user) {
+                window.location.href = 'index.html';
+                return;
+            }
+            
+            const [userDoc, homeworksSnap] = await Promise.all([
+                db.collection('users').doc(user.uid).get(),
+                db.collection('homeworks').get()
+            ]);
+            
+            const data = userDoc.data();
+            const totalHomeworks = homeworksSnap.size;
+            const completedCount = (data.completedHomeworks || []).length;
+            
+            document.getElementById('profile-name').innerText = data.name;
+            document.getElementById('profile-title').innerText = data.title || 'Miss Curiosity';
+            document.getElementById('profile-points').innerText = data.points || 0;
+            document.getElementById('profile-completed').innerText = completedCount;
+            document.getElementById('total-homeworks').innerText = totalHomeworks;
+            document.getElementById('profile-progress').style.width = totalHomeworks > 0 ? (completedCount / totalHomeworks * 100) + '%' : '0%';
+        }
+        
+        function logout() {
+            auth.signOut();
+            window.location.href = 'index.html';
+        }
+        
+        auth.onAuthStateChanged(user => {
+            if (user && window.location.pathname.includes('profile.html')) loadProfile();
+            else if (!user && window.location.pathname.includes('profile.html')) window.location.href = 'index.html';
+        });
+    </script>
+</body>
+</html>
