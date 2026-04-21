@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Админ-панель — ИмиджЛаб</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        .admin-container {
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+        }
+        .admin-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .admin-header .logo-icon {
+            font-size: 48px;
+        }
+        .warning-text {
+            font-size: 12px;
+            color: var(--danger);
+            text-align: center;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <div class="glass" style="width: 100%;">
+            <div class="admin-header">
+                <div class="logo-icon">🔐</div>
+                <h2 style="font-family: 'Playfair Display';">ИмиджЛаб<br><span style="font-size: 14px;">Админ-панель</span></h2>
+            </div>
+            
+            <input type="email" id="admin-email" placeholder="Email администратора" class="input-field">
+            <input type="password" id="admin-password" placeholder="Пароль" class="input-field">
+            <button id="admin-login-btn" class="btn-gold">Войти в админку →</button>
+            
+            <div class="warning-text">
+                ⚠️ Только для администраторов школы
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="firebase-config.js"></script>
+    <script>
+        document.getElementById('admin-login-btn').addEventListener('click', async () => {
+            const email = document.getElementById('admin-email').value;
+            const password = document.getElementById('admin-password').value;
+            
+            try {
+                await auth.signInWithEmailAndPassword(email, password);
+                const user = auth.currentUser;
+                const adminDoc = await db.collection('admins').doc(user.uid).get();
+                if (adminDoc.exists && adminDoc.data().role === 'admin') {
+                    window.location.href = 'admin.html';
+                } else {
+                    alert('У вас нет прав администратора');
+                    await auth.signOut();
+                }
+            } catch (error) {
+                alert('Ошибка входа: ' + error.message);
+            }
+        });
+    </script>
+</body>
+</html>
