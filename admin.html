@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Админ-панель — ИмиджЛаб</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        .admin-nav {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .admin-nav-btn {
+            background: transparent;
+            border: 1px solid var(--primary);
+            color: var(--primary);
+            padding: 8px 16px;
+            border-radius: 40px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .admin-nav-btn.active {
+            background: var(--primary);
+            color: white;
+        }
+        .admin-section {
+            display: none;
+        }
+        .admin-section.active {
+            display: block;
+        }
+        .homework-form {
+            background: white;
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .question-item {
+            background: #F9F5FF;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+        .homework-list-item {
+            background: white;
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .delete-btn {
+            background: var(--danger);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+        }
+        .image-preview {
+            margin: 10px 0;
+            max-width: 100%;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .image-preview img {
+            max-width: 100%;
+            height: auto;
+        }
+        .stats-card {
+            background: white;
+            padding: 16px;
+            border-radius: 16px;
+            margin-bottom: 12px;
+        }
+        .export-btn {
+            background: var(--success);
+            margin-top: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="glass">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <div>
+                    <span class="logo-icon">💜</span>
+                    <span class="logo-text">Имидж<span class="gold">Лаб</span></span>
+                    <div style="font-size: 12px; color: var(--text-gray);">Админ-панель</div>
+                </div>
+                <button onclick="logout()" class="btn-outline" style="padding: 8px 16px;">Выйти</button>
+            </div>
+            
+            <div class="admin-nav">
+                <button class="admin-nav-btn active" data-section="add">➕ Добавить задание</button>
+                <button class="admin-nav-btn" data-section="list">📋 Список заданий</button>
+                <button class="admin-nav-btn" data-section="stats">📊 Статистика школы</button>
+            </div>
+            
+            <!-- Секция: Добавление задания -->
+            <div id="add-section" class="admin-section active">
+                <h3 style="margin-bottom: 16px;">Новое домашнее задание</h3>
+                <div class="homework-form">
+                    <input type="text" id="hw-title" placeholder="Название фильма" class="input-field">
+                    <input type="text" id="hw-duration" placeholder="Длительность (например: 120 мин)" class="input-field">
+                    <input type="text" id="hw-youtube" placeholder="Ссылка на YouTube трейлер" class="input-field">
+                    
+                    <label style="font-size: 14px; color: var(--text-gray);">Постер (загрузите изображение):</label>
+                    <input type="file" id="hw-poster-file" accept="image/*" class="input-field">
+                    <div id="poster-preview" class="image-preview"></div>
+                    
+                    <h4 style="margin: 16px 0 8px;">Вопросы для теста</h4>
+                    <div id="questions-container"></div>
+                    <button onclick="addQuestionField()" class="btn-outline" style="margin: 8px 0;">+ Добавить вопрос</button>
+                    
+                    <button onclick="saveHomework()" class="btn-gold" style="margin-top: 20px;">Сохранить задание</button>
+                </div>
+            </div>
+            
+            <!-- Секция: Список заданий -->
+            <div id="list-section" class="admin-section">
+                <h3 style="margin-bottom: 16px;">Все задания</h3>
+                <div id="homeworks-list-admin"></div>
+            </div>
+            
+            <!-- Секция: Статистика -->
+            <div id="stats-section" class="admin-section">
+                <h3 style="margin-bottom: 16px;">Статистика школы</h3>
+                <div id="stats-container"></div>
+                <button id="export-excel-btn" class="btn-gold export-btn" style="display: none;">📎 Экспорт в Excel</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
+    <script src="firebase-config.js"></script>
+    <script>
+        let currentPosterUrl = null;
+        
+        // Предпросмотр постера
+        document.getElementById('hw-poster-file')?.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const preview = document.getElementById('poster-preview');
+                    preview.innerHTML = `<img src="${event.target.result}" alt="Preview" style="max-width: 100%; border-radius: 12px;">`;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+        
+        // Добавление вопроса
+        function addQuestionField() {
+            const container = document.getElementById('questions-container');
+            const questionId = Date.now();
+            const div = document.createElement('div');
+            div.className = 'question-item';
+            div.id = `q-${questionId}`;
+            div.innerHTML = `
+                <input type="text" placeholder="Текст вопроса" id="q-text-${questionId}" class="input-field" style="margin-bottom: 8px;">
+                <input type="text" placeholder="Вариант 1" id="q-opt0-${questionId}" class="input-field" style="margin-bottom: 4px;">
+                <input type="text" placeholder="Вариант 2" id="q-opt1-${questionId}" class="input-field" style="margin-bottom: 4px;">
+                <input type="text" placeholder="Вариант 3" id="q-opt2-${questionId}" class="input-field" style="margin-bottom: 4px;">
+                <input type="text" placeholder="Вариант 4" id="q-opt3-${questionId}" class="input-field" style="margin-bottom: 8px;">
+                <select id="q-correct-${questionId}" class="input-field">
+                    <option value="0">Правильный ответ: Вариант 1</option>
+                    <option value="1">Правильный ответ: Вариант 2</option>
+                    <option value="2">Правильный ответ: Вариант 3</option>
+                    <option value="3">Правильный ответ: Вариант 4</option>
+                </select>
+                <button onclick="document.getElementById('q-${questionId}').remove()" class="btn-secondary" style="background: var(--danger); padding: 6px 12px; font-size: 12px;">Удалить вопрос</button>
+            `;
+            container.appendChild(div);
+        }
+        
+        // Загрузка изображения в Storage
+        async function uploadPoster(file) {
+            if (!file) return null;
+            const storageRef = storage.ref();
+            const fileRef = storageRef.child(`posters/${Date.now()}_${file.name}`);
+            await fileRef.put(file);
+            return await fileRef.getDownloadURL();
+        }
+        
+        // Сохранение задания
+        async function saveHomework() {
+            const title = document.getElementById('hw-title').value;
+            const duration = document.getElementById('hw-duration').value;
+            const youtubeUrl = document.getElementById('hw-youtube').value;
+            const posterFile = document.getElementById('hw-poster-file').files[0];
+            
+            if (!title) {
+                alert('Введите название фильма');
+                return;
+            }
+            
+            // Загружаем постер
+            let posterUrl = '';
+            if (posterFile) {
+                posterUrl = await uploadPoster(posterFile);
+            }
+            
+            // Собираем вопросы
+            const questionDivs = document.querySelectorAll('#questions-container .question-item');
+            const questionsList = [];
+            
+            questionDivs.forEach((div) => {
+                const qId = div.id.split('-')[1];
+                const text = document.getElementById(`q-text-${qId}`)?.value;
+                if (text) {
+                    const options = [
+                        document.getElementById(`q-opt0-${qId}`)?.value,
+                        document.getElementById(`q-opt1-${qId}`)?.value,
+                        document.getElementById(`q-opt2-${qId}`)?.value,
+                        document.getElementById(`q-opt3-${qId}`)?.value
+                    ].filter(opt => opt && opt.trim() !== '');
+                    const correct = parseInt(document.getElementById(`q-correct-${qId}`)?.value);
+                    
+                    if (options.length >= 2) {
+                        questionsList.push({ text, options, correct });
+                    }
+                }
+            });
+            
+            if (questionsList.length === 0) {
+                alert('Добавьте хотя бы один вопрос');
+                return;
+            }
+            
+            // Получаем следующий ID
+            const homeworksRef = db.collection('homeworks');
+            const snapshot = await homeworksRef.get();
+            const newId = snapshot.size + 1;
+            
+            await homeworksRef.doc(newId.toString()).set({
+                id: newId,
+                title: title,
+                poster: posterUrl || 'https://via.placeholder.com/400x200?text=Poster',
+                duration: duration || '90 мин',
+                youtubeUrl: youtubeUrl || '',
+                questions: questionsList,
+                createdAt: new Date()
+            });
+            
+            alert('Задание добавлено!');
+            // Очистка формы
+            document.getElementById('hw-title').value = '';
+            document.getElementById('hw-duration').value = '';
+            document.getElementById('hw-youtube').value = '';
+            document.getElementById('hw-poster-file').value = '';
+            document.getElementById('poster-preview').innerHTML = '';
+            document.getElementById('questions-container').innerHTML = '';
+            addQuestionField();
+            
+            loadHomeworksList();
+        }
+        
+        // Загрузка списка заданий
+        async function loadHomeworksList() {
+            const snapshot = await db.collection('homeworks').orderBy('id').get();
+            const container = document.getElementById('homeworks-list-admin');
+            container.innerHTML = '';
+            
+            snapshot.forEach(doc => {
+                const hw = doc.data();
+                const div = document.createElement('div');
+                div.className = 'homework-list-item';
+                div.innerHTML = `
+                    <div>
+                        <strong>${hw.title}</strong><br>
+                        <span style="font-size: 12px;">📝 ${hw.questions?.length || 0} вопросов</span>
+                    </div>
+                    <button onclick="deleteHomework(${hw.id})" class="delete-btn">🗑 Удалить</button>
+                `;
+                container.appendChild(div);
+            });
+        }
+        
+        // Удаление задания
+        async function deleteHomework(id) {
+            if (confirm('Удалить это задание? Все прогрессы учениц по нему тоже удалятся.')) {
+                await db.collection('homeworks').doc(id.toString()).delete();
+                alert('Задание удалено');
+                loadHomeworksList();
+            }
+        }
+        
+        // Статистика и экспорт в Excel
+        async function loadStats() {
+            const usersSnap = await db.collection('users').get();
+            const homeworksSnap = await db.collection('homeworks').get();
+            
+            let totalPoints = 0;
+            let totalCompleted = 0;
+            let students = [];
+            
+            usersSnap.forEach(doc => {
+                const user = doc.data();
+                totalPoints += user.points || 0;
+                const completedCount = (user.completedHomeworks || []).length;
+                totalCompleted += completedCount;
+                students.push({ 
+                    name: user.name, 
+                    email: user.email,
+                    school: user.school || 'ИмиджЛаб',
+                    points: user.points || 0, 
+                    title: user.title || 'Miss Curiosity',
+                    level: user.level || 1,
+                    completedHomeworks: completedCount,
+                    totalHomeworks: homeworksSnap.size
+                });
+            });
+            
+            students.sort((a, b) => b.points - a.points);
+            
+            const container = document.getElementById('stats-container');
+            container.innerHTML = `
+                <div class="stats-card">
+                    <h3>👨‍🎓 Учениц в школе</h3>
+                    <p style="font-size: 32px; font-weight: 700; color: var(--primary);">${usersSnap.size}</p>
+                </div>
+                <div class="stats-card">
+                    <h3>🎬 Всего заданий</h3>
+                    <p style="font-size: 32px; font-weight: 700; color: var(--primary);">${homeworksSnap.size}</p>
+                </div>
+                <div class="stats-card">
+                    <h3>⭐ Всего очков</h3>
+                    <p style="font-size: 32px; font-weight: 700; color: var(--primary);">${totalPoints}</p>
+                </div>
+                <div class="stats-card">
+                    <h3>📊 Средний прогресс</h3>
+                    <p style="font-size: 32px; font-weight: 700; color: var(--primary);">${usersSnap.size > 0 ? Math.round(totalCompleted / usersSnap.size) : 0} заданий</p>
+                </div>
+                <div class="stats-card">
+                    <h3>🏆 Топ-5 учениц</h3>
+                    ${students.slice(0,5).map((s, i) => `
+                        <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee;">
+                            <span>${i+1}. ${s.name}</span>
+                            <span style="color: var(--primary);">${s.points} ⭐</span>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+            
+            // Показываем кнопку экспорта
+            const exportBtn = document.getElementById('export-excel-btn');
+            if (exportBtn) {
+                exportBtn.style.display = 'block';
+                exportBtn.onclick = () => exportToExcel(students);
+            }
+        }
+        
+        // Экспорт в Excel
+        function exportToExcel(students) {
+            const data = students.map((s, index) => ({
+                '№': index + 1,
+                'Имя': s.name,
+                'Email': s.email,
+                'Школа': s.school,
+                'Уровень': s.level,
+                'Звание': s.title,
+                'Очки гениальности': s.points,
+                'Выполнено заданий': `${s.completedHomeworks}/${s.totalHomeworks}`,
+                'Прогресс %': s.totalHomeworks > 0 ? Math.round((s.completedHomeworks / s.totalHomeworks) * 100) : 0
+            }));
+            
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Ученицы ИмиджЛаб');
+            XLSX.writeFile(wb, `ИмиджЛаб_отчёт_${new Date().toISOString().split('T')[0]}.xlsx`);
+        }
+        
+        async function logout() {
+            await auth.signOut();
+            window.location.href = 'admin-login.html';
+        }
+        
+        // Навигация по секциям
+        document.querySelectorAll('.admin-nav-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const section = btn.dataset.section;
+                document.querySelectorAll('.admin-section').forEach(sec => sec.classList.remove('active'));
+                document.getElementById(`${section}-section`).classList.add('active');
+                document.querySelectorAll('.admin-nav-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                
+                if (section === 'list') loadHomeworksList();
+                if (section === 'stats') loadStats();
+            });
+        });
+        
+        // Проверка авторизации админа
+        auth.onAuthStateChanged(async (user) => {
+            if (!user) {
+                window.location.href = 'admin-login.html';
+                return;
+            }
+            const adminDoc = await db.collection('admins').doc(user.uid).get();
+            if (!adminDoc.exists || adminDoc.data().role !== 'admin') {
+                await auth.signOut();
+                window.location.href = 'admin-login.html';
+            }
+        });
+        
+        // Добавляем первый вопрос
+        setTimeout(() => {
+            if (document.getElementById('questions-container')?.children.length === 0) {
+                addQuestionField();
+            }
+        }, 100);
+    </script>
+</body>
+</html>
