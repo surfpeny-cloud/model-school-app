@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Гардеробная — ИмиджЛаб</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <h2 style="font-family: 'Playfair Display';">👗 Мои достижения</h2>
+        <div id="titles-grid" class="glass" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 16px;"></div>
+    </div>
+    
+    <div class="bottom-nav">
+        <button class="nav-item" onclick="location.href='dashboard.html'">📋 Задания</button>
+        <button class="nav-item" onclick="location.href='rating.html'">🏆 Рейтинг</button>
+        <button class="nav-item active" onclick="location.href='wardrobe.html'">👗 Гардеробная</button>
+        <button class="nav-item" onclick="location.href='profile.html'">👤 Профиль</button>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="firebase-config.js"></script>
+    <script>
+        const allTitles = [
+            { name: "Miss Curiosity", points: 0, icon: "🔍", description: "Первые шаги в мире моды", color: "#A9A19A" },
+            { name: "Miss Elegance", points: 150, icon: "💃", description: "Элегантность в каждой детали", color: "#C6A43F" },
+            { name: "Miss Intellectual", points: 300, icon: "📚", description: "Ум и стиль вместе", color: "#9B59B6" },
+            { name: "Miss Genius", points: 500, icon: "👑", description: "Королева интеллекта", color: "#F1C40F" }
+        ];
+        
+        async function loadWardrobe() {
+            const user = auth.currentUser;
+            if (!user) return;
+            const userDoc = await db.collection('users').doc(user.uid).get();
+            const userPoints = userDoc.data().points || 0;
+            
+            const container = document.getElementById('titles-grid');
+            container.innerHTML = '';
+            
+            allTitles.forEach(title => {
+                const isUnlocked = userPoints >= title.points;
+                const div = document.createElement('div');
+                div.style.cssText = `
+                    background: ${isUnlocked ? 'linear-gradient(135deg, #FFF9F0, #FFF)' : '#F5F5F5'};
+                    border-radius: 20px;
+                    padding: 16px;
+                    text-align: center;
+                    opacity: ${isUnlocked ? 1 : 0.6};
+                    filter: ${isUnlocked ? 'none' : 'grayscale(0.3)'};
+                    border: ${isUnlocked && title.name === 'Miss Genius' ? '2px solid #F1C40F' : 'none'};
+                `;
+                div.innerHTML = `
+                    <div style="font-size: 48px;">${title.icon}</div>
+                    <h3 style="margin: 8px 0; color: ${isUnlocked ? title.color : '#A9A19A'};">${title.name}</h3>
+                    <p style="font-size: 12px;">${title.description}</p>
+                    ${!isUnlocked ? `<p style="font-size: 11px; color: var(--gold);">🔥 ${title.points - userPoints} очков до открытия</p>` : '<span style="color: var(--success);">✓ Получено</span>'}
+                `;
+                container.appendChild(div);
+            });
+        }
+        
+        auth.onAuthStateChanged(user => {
+            if (!user) window.location.href = 'index.html';
+            else loadWardrobe();
+        });
+    </script>
+</body>
+</html>
