@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Рейтинг — ИмиджЛаб</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <div class="glass" style="text-align: center; margin-bottom: 20px;">
+            <h2>👑 КОРОНАЦИЯ</h2>
+            <div id="crown-countdown" style="font-size: 24px; font-weight: 700; color: var(--gold);">В конце сезона</div>
+            <p>Выполни все задания, чтобы получить корону на сцене!</p>
+        </div>
+        
+        <h2 style="font-family: 'Playfair Display';">🏆 Топ учениц</h2>
+        <div id="rating-list" class="glass" style="margin-top: 12px;"></div>
+    </div>
+    
+    <div class="bottom-nav">
+        <button class="nav-item" onclick="location.href='dashboard.html'">📋 Задания</button>
+        <button class="nav-item active" onclick="location.href='rating.html'">🏆 Рейтинг</button>
+        <button class="nav-item" onclick="location.href='wardrobe.html'">👗 Гардеробная</button>
+        <button class="nav-item" onclick="location.href='profile.html'">👤 Профиль</button>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="firebase-config.js"></script>
+    <script>
+        async function loadRating() {
+            const usersSnap = await db.collection('users').orderBy('points', 'desc').limit(10).get();
+            const homeworksSnap = await db.collection('homeworks').get();
+            const totalHomeworks = homeworksSnap.size;
+            
+            const container = document.getElementById('rating-list');
+            container.innerHTML = '';
+            let rank = 1;
+            
+            for (const doc of usersSnap.docs) {
+                const user = doc.data();
+                const completedCount = (user.completedHomeworks || []).length;
+                const isGenius = totalHomeworks > 0 && completedCount === totalHomeworks;
+                
+                const div = document.createElement('div');
+                div.className = 'rating-item';
+                div.innerHTML = `
+                    <div class="rating-rank">${rank}</div>
+                    <div style="flex: 1;">
+                        <strong>${user.name}</strong>
+                        ${isGenius ? '<span style="margin-left: 8px;">👑</span>' : ''}
+                        <br><span style="font-size: 12px;">${user.title || 'Miss'}</span>
+                    </div>
+                    <div style="font-weight: 700; color: var(--primary);">${user.points || 0} ⭐</div>
+                `;
+                container.appendChild(div);
+                rank++;
+            }
+            
+            if (usersSnap.size === 0) {
+                container.innerHTML = '<div style="text-align: center;">Пока нет учениц</div>';
+            }
+        }
+        
+        auth.onAuthStateChanged(user => {
+            if (!user) window.location.href = 'index.html';
+            else loadRating();
+        });
+    </script>
+</body>
+</html>
