@@ -63,15 +63,16 @@
             border-radius: 20px;
             cursor: pointer;
         }
-        .image-preview {
+        .poster-preview {
             margin: 10px 0;
             max-width: 100%;
             border-radius: 12px;
             overflow: hidden;
         }
-        .image-preview img {
+        .poster-preview img {
             max-width: 100%;
             height: auto;
+            border-radius: 12px;
         }
         .stats-card {
             background: white;
@@ -82,6 +83,15 @@
         .export-btn {
             background: var(--success);
             margin-top: 16px;
+        }
+        .helper-text {
+            font-size: 12px;
+            color: var(--text-gray);
+            margin-top: 4px;
+            margin-bottom: 12px;
+        }
+        .helper-text a {
+            color: var(--primary);
         }
     </style>
 </head>
@@ -111,9 +121,11 @@
                     <input type="text" id="hw-duration" placeholder="Длительность (например: 120 мин)" class="input-field">
                     <input type="text" id="hw-youtube" placeholder="Ссылка на YouTube трейлер" class="input-field">
                     
-                    <label style="font-size: 14px; color: var(--text-gray);">Постер (загрузите изображение):</label>
-                    <input type="file" id="hw-poster-file" accept="image/*" class="input-field">
-                    <div id="poster-preview" class="image-preview"></div>
+                    <input type="text" id="hw-poster-url" placeholder="Ссылка на постер (URL)" class="input-field">
+                    <div class="helper-text">
+                        📸 Как получить ссылку: загрузите картинку на <a href="https://imgbb.com" target="_blank">imgbb.com</a> → нажмите "Upload" → скопируйте "Direct link"
+                    </div>
+                    <div id="poster-preview" class="poster-preview"></div>
                     
                     <h4 style="margin: 16px 0 8px;">Вопросы для теста</h4>
                     <div id="questions-container"></div>
@@ -141,21 +153,16 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
     <script src="firebase-config.js"></script>
     <script>
-        let currentPosterUrl = null;
-        
-        // Предпросмотр постера
-        document.getElementById('hw-poster-file')?.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function(event) {
-                    const preview = document.getElementById('poster-preview');
-                    preview.innerHTML = `<img src="${event.target.result}" alt="Preview" style="max-width: 100%; border-radius: 12px;">`;
-                };
-                reader.readAsDataURL(file);
+        // Предпросмотр постера по URL
+        document.getElementById('hw-poster-url')?.addEventListener('input', (e) => {
+            const url = e.target.value;
+            const preview = document.getElementById('poster-preview');
+            if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+                preview.innerHTML = `<img src="${url}" alt="Preview" onerror="this.src='https://via.placeholder.com/400x200?text=Ошибка+загрузки'">`;
+            } else {
+                preview.innerHTML = '';
             }
         });
         
@@ -183,31 +190,16 @@
             container.appendChild(div);
         }
         
-        // Загрузка изображения в Storage
-        async function uploadPoster(file) {
-            if (!file) return null;
-            const storageRef = storage.ref();
-            const fileRef = storageRef.child(`posters/${Date.now()}_${file.name}`);
-            await fileRef.put(file);
-            return await fileRef.getDownloadURL();
-        }
-        
-        // Сохранение задания
+        // Сохранение задания (без Storage)
         async function saveHomework() {
             const title = document.getElementById('hw-title').value;
             const duration = document.getElementById('hw-duration').value;
             const youtubeUrl = document.getElementById('hw-youtube').value;
-            const posterFile = document.getElementById('hw-poster-file').files[0];
+            const posterUrl = document.getElementById('hw-poster-url').value;
             
             if (!title) {
                 alert('Введите название фильма');
                 return;
-            }
-            
-            // Загружаем постер
-            let posterUrl = '';
-            if (posterFile) {
-                posterUrl = await uploadPoster(posterFile);
             }
             
             // Собираем вопросы
@@ -217,7 +209,7 @@
             questionDivs.forEach((div) => {
                 const qId = div.id.split('-')[1];
                 const text = document.getElementById(`q-text-${qId}`)?.value;
-                if (text) {
+                if (text && text.trim() !== '') {
                     const options = [
                         document.getElementById(`q-opt0-${qId}`)?.value,
                         document.getElementById(`q-opt1-${qId}`)?.value,
@@ -242,10 +234,16 @@
             const snapshot = await homeworksRef.get();
             const newId = snapshot.size + 1;
             
+            // Проверяем URL постера
+            let finalPosterUrl = posterUrl;
+            if (!finalPosterUrl || finalPosterUrl === '') {
+                finalPosterUrl = 'https://via.placeholder.com/400x200?text=ИмиджЛаб';
+            }
+            
             await homeworksRef.doc(newId.toString()).set({
                 id: newId,
                 title: title,
-                poster: posterUrl || 'https://via.placeholder.com/400x200?text=Poster',
+                poster: finalPosterUrl,
                 duration: duration || '90 мин',
                 youtubeUrl: youtubeUrl || '',
                 questions: questionsList,
@@ -257,7 +255,7 @@
             document.getElementById('hw-title').value = '';
             document.getElementById('hw-duration').value = '';
             document.getElementById('hw-youtube').value = '';
-            document.getElementById('hw-poster-file').value = '';
+            document.getElementById('hw-poster-url').value = '';
             document.getElementById('poster-preview').innerHTML = '';
             document.getElementById('questions-container').innerHTML = '';
             addQuestionField();
@@ -270,6 +268,11 @@
             const snapshot = await db.collection('homeworks').orderBy('id').get();
             const container = document.getElementById('homeworks-list-admin');
             container.innerHTML = '';
+            
+            if (snapshot.empty) {
+                container.innerHTML = '<div class="glass" style="text-align: center;">Нет заданий. Создайте первое!</div>';
+                return;
+            }
             
             snapshot.forEach(doc => {
                 const hw = doc.data();
@@ -352,9 +355,8 @@
                 </div>
             `;
             
-            // Показываем кнопку экспорта
             const exportBtn = document.getElementById('export-excel-btn');
-            if (exportBtn) {
+            if (exportBtn && students.length > 0) {
                 exportBtn.style.display = 'block';
                 exportBtn.onclick = () => exportToExcel(students);
             }
@@ -412,7 +414,7 @@
             }
         });
         
-        // Добавляем первый вопрос
+        // Добавляем первый вопрос при загрузке
         setTimeout(() => {
             if (document.getElementById('questions-container')?.children.length === 0) {
                 addQuestionField();
